@@ -1,0 +1,32 @@
+:root {
+	--bg: #0f0f12;
+	--surface: #18181c;
+	--border: #2a2a30;
+	--text: #e4e4e7;
+	--muted: #71717a;
+	--accent: #22c55e;
+	--accent-dim: #16a34a;
+	--error: #ef4444;
+	--radius: 8px;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: "JetBrains Mono", "SF Mono", "Consolas", monospace;
+	background: var(--bg);
+	color: var(--text);
+	min-height: 100vh;
+}
+
+button {
+	font-family: inherit;
+	cursor: pointer;
+}
+
+input {
+	font-family: inherit;
+}
