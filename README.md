@@ -22,8 +22,11 @@ From your PC, one script starts the bridge and exposes it with ngrok so a viewer
 2. **Set it once** (then run `npm run go` anytime):
    - **Option A — .env file:** Copy `.env.example` to `.env` and set `NGROK_AUTHTOKEN=your_token_here`
    - **Option B — shell:** PowerShell `$env:NGROK_AUTHTOKEN="your_token_here"` · CMD `set NGROK_AUTHTOKEN=...` · Bash `export NGROK_AUTHTOKEN=...`
-3. **Run:** `npm install` then `npm run go`
-4. The script prints a **public URL**. Share that URL with the viewer; they paste it into the Vercel site and click Connect.
+3. **Optional — one-click link:** In `.env` set `REMOTE_LIMELIGHT_APP_URL=https://your-app.vercel.app` (your deployed app URL). Then `npm run go` prints a **share link**; the viewer opens that link and the app **auto-connects** (no paste).
+4. **Run:** `npm install` then `npm run go`
+5. Share the printed URL with the viewer:
+   - **With REMOTE_LIMELIGHT_APP_URL set:** Share the full link — viewer opens it and connects automatically.
+   - **Otherwise:** Share the bridge URL; viewer pastes it into the app and clicks Connect.
 
 Press **Ctrl+C** to stop the bridge and tunnel.
 

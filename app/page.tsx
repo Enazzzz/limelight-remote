@@ -3,9 +3,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const BRIDGE_STORAGE_KEY = "remote-limelight-bridge-url";
+/** Build-time default bridge URL (optional). Set NEXT_PUBLIC_BRIDGE_URL for a fixed tunnel. */
+const DEFAULT_BRIDGE_URL = process.env.NEXT_PUBLIC_BRIDGE_URL || "";
 
 /** Default stream path on many MJPEG cameras; bridge proxies this from Limelight. */
 const STREAM_PATH = "/";
+
+/** Parse bridge URL from ?bridge=... (valid https or http for localhost). */
+function getBridgeFromQuery(): string | null {
+	if (typeof window === "undefined") return null;
+	const params = new URLSearchParams(window.location.search);
+	const bridge = params.get("bridge");
+	if (!bridge || !bridge.startsWith("http")) return null;
+	try {
+		const u = new URL(bridge);
+		if (u.protocol === "https:") return bridge;
+		if (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1")) return bridge;
+		// On HTTPS site, only allow https bridge (no mixed content)
+		if (window.location.protocol === "https:" && u.protocol === "http:") return null;
+		return bridge;
+	} catch {
+		return null;
+	}
+}
 
 export default function Home() {
 	const [bridgeUrl, setBridgeUrl] = useState("");
@@ -13,16 +33,31 @@ export default function Home() {
 	const [connected, setConnected] = useState(false);
 	const [connectionError, setConnectionError] = useState<string | null>(null);
 	const [controllerActive, setControllerActive] = useState(false);
+	const [autoConnecting, setAutoConnecting] = useState(false);
 	const wsRef = useRef<WebSocket | null>(null);
 	const pollRef = useRef<number>(0);
+	const autoConnectDoneRef = useRef(false);
+	const connectRef = useRef<() => void>(() => {});
 
-	// Load saved bridge URL on mount
+	// Load saved bridge URL or ?bridge= param or NEXT_PUBLIC_BRIDGE_URL; auto-connect when URL comes from link/env
 	useEffect(() => {
 		if (typeof window === "undefined") return;
+		const fromQuery = getBridgeFromQuery();
+		if (fromQuery) {
+			// Share link: use bridge from URL and trigger auto-connect after state is set
+			window.history.replaceState({}, "", window.location.pathname);
+			setBridgeInput(fromQuery);
+			setBridgeUrl(fromQuery);
+			localStorage.setItem(BRIDGE_STORAGE_KEY, fromQuery.replace(/\/+$/, ""));
+			setAutoConnecting(true);
+			return;
+		}
 		const saved = localStorage.getItem(BRIDGE_STORAGE_KEY);
-		if (saved) {
-			setBridgeUrl(saved);
-			setBridgeInput(saved);
+		const initial = saved || DEFAULT_BRIDGE_URL;
+		if (initial) {
+			setBridgeUrl(initial);
+			setBridgeInput(initial);
+			if (DEFAULT_BRIDGE_URL && !saved) setAutoConnecting(true);
 		}
 	}, []);
 
@@ -66,6 +101,18 @@ export default function Home() {
 			setConnectionError("WebSocket error. Is the bridge running and reachable?");
 		};
 	}, [bridgeInput, saveBridgeUrl]);
+
+	// Keep ref pointing at latest connect for auto-connect effect
+	connectRef.current = connect;
+
+	// Auto-connect when we have a bridge URL from share link (?bridge=) or NEXT_PUBLIC_BRIDGE_URL
+	useEffect(() => {
+		if (autoConnecting && bridgeInput && !autoConnectDoneRef.current) {
+			autoConnectDoneRef.current = true;
+			setAutoConnecting(false);
+			connectRef.current();
+		}
+	}, [autoConnecting, bridgeInput]);
 
 	const disconnect = useCallback(() => {
 		if (wsRef.current) {
@@ -118,7 +165,10 @@ export default function Home() {
 			</header>
 
 			<section className="bridge-section">
-				<label className="label">Bridge URL (host shares this with you — works from any network)</label>
+				<label className="label">
+					Bridge URL (host shares this with you — works from any network)
+					{autoConnecting && <span className="connecting"> Connecting…</span>}
+				</label>
 				<div className="row">
 					<input
 						type="url"
@@ -238,6 +288,10 @@ export default function Home() {
 				}
 				.btn-danger:hover {
 					opacity: 0.9;
+				}
+				.connecting {
+					color: var(--muted);
+					font-weight: normal;
 				}
 				.error {
 					color: var(--error);

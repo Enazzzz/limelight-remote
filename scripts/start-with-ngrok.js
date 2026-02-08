@@ -101,12 +101,23 @@ async function main() {
 	}
 
 	const url = listener.url();
+	const appUrl = process.env.REMOTE_LIMELIGHT_APP_URL;
+	const shareLink = appUrl ? `${appUrl.replace(/\/+$/, "")}?bridge=${encodeURIComponent(url)}` : null;
+
 	console.log("");
 	console.log("  >>> Remote Limelight is ONLINE <<<");
-	console.log("  Share this URL with the viewer (works from any network):");
-	console.log("");
-	console.log("      " + url);
-	console.log("");
+	if (shareLink) {
+		console.log("  Share this link — viewer opens it and connects automatically (no paste):");
+		console.log("");
+		console.log("      " + shareLink);
+		console.log("");
+	} else {
+		console.log("  Bridge URL (viewer pastes this into the app):");
+		console.log("");
+		console.log("      " + url);
+		console.log("");
+		console.log("  Tip: set REMOTE_LIMELIGHT_APP_URL in .env to your Vercel app URL to get a one-click share link.");
+	}
 	console.log("  Press Ctrl+C to stop the bridge and tunnel.");
 	console.log("");
 
