@@ -8,7 +8,9 @@
 		"start": "next start",
 		"lint": "next lint",
 		"bridge": "node bridge/index.js",
-		"go": "node scripts/start-with-ngrok.js"
+		"go": "node scripts/start-with-ngrok.js",
+		"driver-station": "node scripts/start-with-driver-station.js",
+		"test:fake": "node scripts/fake-limelight.js"
 	},
 	"dependencies": {
 		"@ngrok/ngrok": "^1.7.0",

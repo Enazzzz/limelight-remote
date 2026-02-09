@@ -1,0 +1,3 @@
+# Optional: for scripts/controller_to_networktables.py (WPILib NetworkTables publisher)
+# Install: pip install -r scripts/requirements-nt.txt
+pynetworktables

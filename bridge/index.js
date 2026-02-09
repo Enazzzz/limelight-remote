@@ -6,10 +6,25 @@
 const http = require("http");
 const { WebSocketServer } = require("ws");
 
+const fs = require("fs");
+
 const BRIDGE_PORT = Number(process.env.BRIDGE_PORT) || 3999;
 const LIMELIGHT_ORIGIN = process.env.LIMELIGHT_ORIGIN || "http://limelight-one.local:5800";
+/** Optional: append each controller JSON line to this file (e.g. for testing or robot input). */
+const CONTROLLER_LOG_PATH = process.env.BRIDGE_CONTROLLER_LOG || "";
 
 let currentClient = null;
+
+function onControllerMessage(msg) {
+	console.log("[controller]", JSON.stringify(msg));
+	if (CONTROLLER_LOG_PATH) {
+		try {
+			fs.appendFileSync(CONTROLLER_LOG_PATH, JSON.stringify(msg) + "\n");
+		} catch (err) {
+			console.error("[controller log]", err.message);
+		}
+	}
+}
 
 const server = http.createServer((req, res) => {
 	// Do not proxy WebSocket path; let WebSocketServer handle it
@@ -56,8 +71,7 @@ wss.on("connection", (ws, req) => {
 	ws.on("message", (data) => {
 		try {
 			const msg = JSON.parse(data.toString());
-			// Emit to your local app: print to stdout so you can pipe to another process, or add a TCP forward here.
-			console.log("[controller]", JSON.stringify(msg));
+			onControllerMessage(msg);
 		} catch {
 			// ignore non-JSON
 		}
@@ -73,5 +87,6 @@ server.listen(BRIDGE_PORT, "0.0.0.0", () => {
 	console.log("Bridge listening on http://0.0.0.0:" + BRIDGE_PORT);
 	console.log("  Limelight proxy -> " + LIMELIGHT_ORIGIN);
 	console.log("  WebSocket /ws   -> one controller client");
+	if (CONTROLLER_LOG_PATH) console.log("  Controller log   -> " + CONTROLLER_LOG_PATH);
 	console.log("Expose with: ngrok http " + BRIDGE_PORT);
 });
