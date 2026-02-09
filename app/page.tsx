@@ -13,15 +13,17 @@ const STREAM_PATH = "/";
 function getBridgeFromQuery(): string | null {
 	if (typeof window === "undefined") return null;
 	const params = new URLSearchParams(window.location.search);
-	const bridge = params.get("bridge");
-	if (!bridge || !bridge.startsWith("http")) return null;
+	const raw = params.get("bridge");
+	const bridge = raw ? raw.trim() : "";
+	if (!bridge) return null;
+	// Allow URL with or without protocol (ngrok-style hostnames)
+	const withProtocol = bridge.startsWith("http") ? bridge : "https://" + bridge;
 	try {
-		const u = new URL(bridge);
-		if (u.protocol === "https:") return bridge;
-		if (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1")) return bridge;
-		// On HTTPS site, only allow https bridge (no mixed content)
+		const u = new URL(withProtocol);
+		if (u.protocol === "https:") return u.origin;
+		if (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1")) return u.origin;
 		if (window.location.protocol === "https:" && u.protocol === "http:") return null;
-		return bridge;
+		return u.origin;
 	} catch {
 		return null;
 	}
@@ -39,13 +41,17 @@ export default function Home() {
 	const autoConnectDoneRef = useRef(false);
 	const connectRef = useRef<() => void>(() => {});
 
+	// Read ?bridge= once and keep it so Strict Mode / double-run doesn't wipe it
+	const bridgeFromQueryRef = useRef<string | null>(null);
+	if (typeof window !== "undefined" && bridgeFromQueryRef.current === null) {
+		bridgeFromQueryRef.current = getBridgeFromQuery();
+	}
+
 	// Load saved bridge URL or ?bridge= param or NEXT_PUBLIC_BRIDGE_URL; auto-connect when URL comes from link/env
 	useEffect(() => {
 		if (typeof window === "undefined") return;
-		const fromQuery = getBridgeFromQuery();
+		const fromQuery = bridgeFromQueryRef.current;
 		if (fromQuery) {
-			// Share link: use bridge from URL and trigger auto-connect after state is set
-			window.history.replaceState({}, "", window.location.pathname);
 			setBridgeInput(fromQuery);
 			setBridgeUrl(fromQuery);
 			localStorage.setItem(BRIDGE_STORAGE_KEY, fromQuery.replace(/\/+$/, ""));
@@ -111,6 +117,10 @@ export default function Home() {
 			autoConnectDoneRef.current = true;
 			setAutoConnecting(false);
 			connectRef.current();
+			// Clean share link from URL after using it (so refresh doesn't re-trigger)
+			if (bridgeFromQueryRef.current) {
+				window.history.replaceState({}, "", window.location.pathname);
+			}
 		}
 	}, [autoConnecting, bridgeInput]);
 
