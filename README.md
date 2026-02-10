@@ -16,42 +16,27 @@ Stream your Limelight camera feed over the web and send controller input from a 
 
 Live app: **[https://limelight-remote.vercel.app](https://limelight-remote.vercel.app)**
 
-## One command to get online (bridge + ngrok)
+## Run everything (single command)
 
-From your PC, one script starts the bridge and exposes it with ngrok so a viewer can connect from anywhere:
-
-1. **Get a free ngrok auth token:** [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
-2. **Set it once** (then run `npm run go` anytime):
-   - **Option A — .env file:** Copy `.env.example` to `.env` and set `NGROK_AUTHTOKEN=your_token_here`
-   - **Option B — shell:** PowerShell `$env:NGROK_AUTHTOKEN="your_token_here"` · CMD `set NGROK_AUTHTOKEN=...` · Bash `export NGROK_AUTHTOKEN=...`
-3. **Optional — one-click link:** In `.env` set `REMOTE_LIMELIGHT_APP_URL=https://limelight-remote.vercel.app`. Then `npm run go` prints a **share link**; the viewer opens that link and the app **auto-connects** (no paste).
-4. **Run:** `npm install` then `npm run go`
-5. Share the printed URL with the viewer:
-   - **With REMOTE_LIMELIGHT_APP_URL set:** Share the full link — viewer opens it and connects automatically.
-   - **Otherwise:** Share the bridge URL; viewer pastes it into the app and clicks Connect.
-
-Press **Ctrl+C** to stop the bridge and tunnel.
-
-## Run one script alongside Driver Station (FRC)
-
-**One command** that starts everything you need in parallel with the Driver Station: bridge, ngrok, controller log, and (optionally) fake Limelight + NetworkTables publisher so the robot gets remote controller input.
+**One script** starts the bridge, ngrok, controller log, and (optionally) fake Limelight and NetworkTables publisher. Run it alongside Driver Station or anytime you want the app online.
 
 1. **One-time setup**
-   - In `.env`: `NGROK_AUTHTOKEN=...` (required). Optional: `REMOTE_LIMELIGHT_APP_URL=https://limelight-remote.vercel.app`, `TEAM=1234` (your FRC team number for NetworkTables).
-   - Optional: `pip install pynetworktables` so the script can publish controller data to the robot.
-2. **At the field or at your desk**
-   - Open **Driver Station** as usual.
-   - In a second terminal: `npm run driver-station` (or `node scripts/start-with-driver-station.js`).
-   - Leave that window open. It starts the bridge, ngrok, writes controller input to `controller.log`, and (if `TEAM` or `NT_SERVER` is set) runs the NetworkTables publisher so the robot can read `RemoteLimelight/axes` and `RemoteLimelight/buttons`.
-3. **Share the printed link** with the remote operator; they open it and control as usual. Press **Ctrl+C** in the script window to stop everything.
+   - Copy `.env.example` to `.env`. Set **`NGROK_AUTHTOKEN`** (get a free token at [dashboard.ngrok.com/get-started/your-authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)).
+   - Optional in `.env`: `REMOTE_LIMELIGHT_APP_URL=https://limelight-remote.vercel.app` (so the script prints a one-click share link), `TEAM=1234` (to publish controller to robot NetworkTables), `USE_FAKE_LIMELIGHT=1` (no real camera).
+   - Optional for WPILib: `pip install pynetworktables` so controller data is published to the robot.
+2. **Run**
+   - `npm install` then **`npm start`**
+   - Leave the window open. Share the printed link with the remote viewer. Press **Ctrl+C** to stop.
 
-**Optional env for the single script:**
+The script starts: **bridge** (proxies Limelight, accepts WebSocket, writes to `controller.log`) → **ngrok** (exposes the bridge) → optionally **fake Limelight** (if `USE_FAKE_LIMELIGHT=1`) and **NetworkTables publisher** (if `TEAM` or `NT_SERVER` is set).
 
 | Env | Purpose |
 |-----|--------|
-| `USE_FAKE_LIMELIGHT=1` | No real camera: run a fake Limelight for testing (e.g. at home without robot). |
-| `TEAM=1234` | Publish controller to robot NetworkTables (roboRIO-1234.local). |
-| `NT_SERVER=10.0.0.2` | Publish to a specific NetworkTables server instead of team number. |
+| `NGROK_AUTHTOKEN` | Required. ngrok auth token. |
+| `REMOTE_LIMELIGHT_APP_URL` | Optional. Your Vercel app URL; script prints a one-click share link. |
+| `USE_FAKE_LIMELIGHT=1` | Optional. No real camera: run fake Limelight for testing. |
+| `TEAM=1234` | Optional. Publish controller to robot NetworkTables (roboRIO-1234.local). |
+| `NT_SERVER=10.0.0.2` | Optional. Publish to this NetworkTables server instead of team number. |
 
 ## Run the bridge only (no tunnel)
 
@@ -61,7 +46,7 @@ Press **Ctrl+C** to stop the bridge and tunnel.
    - `BRIDGE_PORT=4000 npm run bridge`
    - `LIMELIGHT_ORIGIN=http://192.168.1.50:5800 npm run bridge`
 
-## Expose the bridge manually (alternative to `npm run go`)
+## Expose the bridge manually (alternative to `npm start`)
 
 If you prefer not to use the script, you can run the bridge and ngrok separately:
 
@@ -106,7 +91,7 @@ Remote Limelight is compatible with [WPILib](https://docs.wpilib.org/) (FRC) rob
 
 A Python script can read the controller log and publish to **NetworkTables** so your WPILib robot subscribes like a normal joystick:
 
-1. **Bridge writes to log:** `set BRIDGE_CONTROLLER_LOG=controller.log` then run the bridge (or `npm run go`).
+1. **Bridge writes to log:** when you run `npm start`, the bridge writes to `controller.log` automatically. Or run the bridge alone with `BRIDGE_CONTROLLER_LOG=controller.log npm run bridge`.
 2. **Install Python NT client:** `pip install pynetworktables` (RobotPy; for FRC NT3).
 3. **Run the script:** `set TEAM=1234` then `python scripts/controller_to_networktables.py controller.log` (replace 1234 with your team number; or set `NT_SERVER=10.0.0.2` for a specific host).
 4. **Robot code:** Subscribe to `RemoteLimelight/axes` (double array) and `RemoteLimelight/buttons` (boolean array). Example (Java):  
@@ -130,8 +115,8 @@ To test the full flow without a real Limelight or robot:
    Serves a test “camera” page at http://127.0.0.1:5800 (animated placeholder).
 
 2. **Terminal 2 — bridge pointed at fake:**  
-   - Windows: `set LIMELIGHT_ORIGIN=http://127.0.0.1:5800` then `npm run bridge` (or `npm run go`).  
-   - Bash: `LIMELIGHT_ORIGIN=http://127.0.0.1:5800 npm run bridge` (or `npm run go`).
+   - Windows: `set LIMELIGHT_ORIGIN=http://127.0.0.1:5800` then `npm run bridge` (or `npm start` with that env set).  
+   - Bash: `LIMELIGHT_ORIGIN=http://127.0.0.1:5800 npm run bridge` (or `npm start`).
 
 3. Open the app (local or [limelight-remote.vercel.app](https://limelight-remote.vercel.app)), connect to your bridge URL. You’ll see the fake feed and can test gamepad input; the bridge will print controller JSON to stdout (or to a file if you set `BRIDGE_CONTROLLER_LOG`).
 

@@ -6,8 +6,7 @@
  * Requires: NGROK_AUTHTOKEN in .env or environment.
  * Optional: USE_FAKE_LIMELIGHT=1 (no real camera), TEAM=1234 or NT_SERVER=... (publish to robot NT).
  *
- * Usage: npm run driver-station
- * Or:    node scripts/start-with-driver-station.js
+ * Usage: npm start   (or: npm run go   or   node scripts/start-with-driver-station.js)
  */
 
 const { spawn } = require("child_process");

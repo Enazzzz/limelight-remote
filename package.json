@@ -5,11 +5,11 @@
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
-		"start": "next start",
+		"start": "node scripts/start-with-driver-station.js",
+		"serve": "next start",
+		"go": "npm start",
 		"lint": "next lint",
 		"bridge": "node bridge/index.js",
-		"go": "node scripts/start-with-ngrok.js",
-		"driver-station": "node scripts/start-with-driver-station.js",
 		"test:fake": "node scripts/fake-limelight.js"
 	},
 	"dependencies": {

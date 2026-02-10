@@ -5,7 +5,7 @@
  *
  * Usage: npm run test:fake
  * Then in another terminal: LIMELIGHT_ORIGIN=http://127.0.0.1:5800 npm run bridge
- * Or: LIMELIGHT_ORIGIN=http://127.0.0.1:5800 npm run go
+ * Or: LIMELIGHT_ORIGIN=http://127.0.0.1:5800 npm start
  */
 
 const http = require("http");
@@ -82,7 +82,7 @@ server.listen(PORT, "127.0.0.1", () => {
 	console.log("  Point the bridge at it:");
 	console.log("    set LIMELIGHT_ORIGIN=http://127.0.0.1:" + PORT + "   (Windows)");
 	console.log("    export LIMELIGHT_ORIGIN=http://127.0.0.1:" + PORT + "   (bash)");
-	console.log("  Then run: npm run bridge   or   npm run go");
+	console.log("  Then run: npm run bridge   or   npm start");
 	console.log("  Press Ctrl+C to stop.");
 	console.log("");
 });
