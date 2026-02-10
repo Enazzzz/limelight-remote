@@ -153,7 +153,8 @@ export default function Home() {
 	// Use proxy so ngrok's free-tier interstitial is skipped (server sends ngrok-skip-browser-warning)
 	const streamUrl = bridgeUrl ? `${bridgeUrl}${STREAM_PATH}` : "";
 	const iframeSrc = streamUrl ? `/api/proxy?url=${encodeURIComponent(streamUrl)}` : "";
-	const theaterMode = connected && iframeSrc;
+	// Fullscreen whenever we have a stream URL (stays fullscreen, no flicker)
+	const theaterMode = !!iframeSrc;
 
 	return (
 		<main className={theaterMode ? "container theater" : "container"}>
@@ -198,15 +199,33 @@ export default function Home() {
 					{theaterMode && (
 						<div className="top-bar">
 							<span className="top-bar-title">Remote Limelight</span>
-							<span className={`top-bar-badge ${controllerActive ? "active" : ""}`}>
-								{controllerActive ? "Gamepad" : "No gamepad"}
-							</span>
-							<button type="button" onClick={() => setShowInputBar((v) => !v)} className="btn btn-ghost">
-								{showInputBar ? "Hide inputs" : "Show inputs"}
-							</button>
-							<button type="button" onClick={disconnect} className="btn btn-danger btn-sm">
-								Disconnect
-							</button>
+							{connected ? (
+								<>
+									<span className={`top-bar-badge ${controllerActive ? "active" : ""}`}>
+										{controllerActive ? "Gamepad" : "No gamepad"}
+									</span>
+									<button type="button" onClick={() => setShowInputBar((v) => !v)} className="btn btn-ghost">
+										{showInputBar ? "Hide inputs" : "Show inputs"}
+									</button>
+									<button type="button" onClick={disconnect} className="btn btn-danger btn-sm">
+										Disconnect
+									</button>
+								</>
+							) : (
+								<>
+									<input
+										type="url"
+										placeholder="https://xxxx.ngrok.io"
+										value={bridgeInput}
+										onChange={(e) => setBridgeInput(e.target.value)}
+										onKeyDown={(e) => e.key === "Enter" && connect()}
+										className="input input-topbar"
+									/>
+									<button type="button" onClick={connect} className="btn btn-primary btn-sm">
+										Connect
+									</button>
+								</>
+							)}
 						</div>
 					)}
 					{!theaterMode && (
@@ -328,6 +347,11 @@ export default function Home() {
 				}
 				.btn-sm {
 					padding: 0.35rem 0.75rem;
+					font-size: 0.8rem;
+				}
+				.input-topbar {
+					max-width: 280px;
+					padding: 0.35rem 0.6rem;
 					font-size: 0.8rem;
 				}
 				.input-bar {
