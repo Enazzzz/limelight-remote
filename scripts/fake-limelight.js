@@ -55,7 +55,7 @@ const FAKE_HTML = `<!DOCTYPE html>
 			ctx.textAlign = "center";
 			ctx.fillText("Fake Limelight — " + new Date().toISOString().slice(11, 19), w / 2, h / 2);
 			ctx.font = "14px monospace";
-			ctx.fillText("test feed (no buh)", w / 2, h / 2 + 32);
+			ctx.fillText("test feed (bingus)", w / 2, h / 2 + 32);
 			t += 0.5;
 			requestAnimationFrame(draw);
 		}
