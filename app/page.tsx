@@ -89,6 +89,7 @@ export default function Home() {
 	const [recordedFrames, setRecordedFrames] = useState<MacroFrame[]>([]);
 	const [macros, setMacros] = useState<SavedMacro[]>([]);
 	const [playingMacroId, setPlayingMacroId] = useState<string | null>(null);
+	const [playbackCurrentFrame, setPlaybackCurrentFrame] = useState<{ axes: number[]; buttons: number[] } | null>(null);
 	const [selectedMacroId, setSelectedMacroId] = useState<string>("");
 	const wsRef = useRef<WebSocket | null>(null);
 	const [connectionId, setConnectionId] = useState(0);
@@ -223,8 +224,14 @@ export default function Home() {
 
 	const playMacro = useCallback((id: string) => {
 		if (!connected) return;
+		setShowInputBar(true); // show inputs so user can verify macro playback
 		setPlayingMacroId(id);
 	}, [connected]);
+
+	const stopMacroPlayback = useCallback(() => {
+		setPlayingMacroId(null);
+		setPlaybackCurrentFrame(null);
+	}, []);
 
 	const deleteMacro = useCallback((id: string) => {
 		const next = macros.filter((m) => m.id !== id);
@@ -275,20 +282,23 @@ export default function Home() {
 		};
 	}, [connected, connectionId]);
 
-	// Play back a saved macro: send frames over WebSocket with original timing
+	// Play back a saved macro: send frames over WebSocket with original timing; show current frame in input bar
 	useEffect(() => {
 		if (!playingMacroId || !connected || !wsRef.current) return;
 		const macro = macros.find((m) => m.id === playingMacroId);
 		if (!macro?.frames?.length) {
 			setPlayingMacroId(null);
+			setPlaybackCurrentFrame(null);
 			return;
 		}
+		setPlaybackCurrentFrame({ axes: macro.frames[0].axes, buttons: macro.frames[0].buttons });
 		const baseTime = macro.frames[0].timestamp;
 		const timeouts: number[] = [];
 		for (let i = 0; i < macro.frames.length; i++) {
 			const frame = macro.frames[i];
 			const delay = frame.timestamp - baseTime;
 			const t = window.setTimeout(() => {
+				setPlaybackCurrentFrame({ axes: frame.axes, buttons: frame.buttons });
 				if (wsRef.current?.readyState !== WebSocket.OPEN) return;
 				try {
 					wsRef.current.send(JSON.stringify({ axes: frame.axes, buttons: frame.buttons, timestamp: Date.now() }));
@@ -301,10 +311,12 @@ export default function Home() {
 		const endDelay = macro.frames[macro.frames.length - 1].timestamp - baseTime + 50;
 		const cleanup = window.setTimeout(() => {
 			setPlayingMacroId(null);
+			setPlaybackCurrentFrame(null);
 		}, endDelay);
 		return () => {
 			timeouts.forEach((id) => clearTimeout(id));
 			clearTimeout(cleanup);
+			setPlaybackCurrentFrame(null);
 		};
 	}, [playingMacroId, connected, macros]);
 
@@ -313,7 +325,11 @@ export default function Home() {
 	const iframeSrc = streamUrl ? `/api/proxy?url=${encodeURIComponent(streamUrl)}` : "";
 	// Fullscreen whenever we have a stream URL (stays fullscreen, no flicker)
 	const theaterMode = !!iframeSrc;
-	const controllerType = detectControllerType(lastInput?.id);
+	// When playing a macro, show the current playback frame in the input bar (live input is blocked)
+	const displayInput = playingMacroId && playbackCurrentFrame
+		? { ...playbackCurrentFrame, id: lastInput?.id }
+		: lastInput;
+	const controllerType = detectControllerType(displayInput?.id);
 	const friendlyButtonLabels = controllerType === "playstation" ? PS_BUTTON_LABELS : XBOX_BUTTON_LABELS;
 
 	return (
@@ -406,13 +422,22 @@ export default function Home() {
 
 			{theaterMode && showInputBar && (
 				<div className="input-bar">
+					{playingMacroId && (
+						<div className="input-bar-row input-bar-playback">
+							<span className="input-bar-label">Playback</span>
+							<span className="input-bar-playback-label">Playing macro — inputs blocked</span>
+							<button type="button" className="input-bar-toggle active" onClick={stopMacroPlayback} title="Stop macro playback">
+								Stop
+							</button>
+						</div>
+					)}
 					<div className="input-bar-content">
 						{inputDisplayMode === "raw" ? (
 							<>
 								<div className="input-bar-row">
 									<span className="input-bar-label">Axes</span>
 									<div className="input-bar-axes">
-										{lastInput ? lastInput.axes.map((a, i) => (
+										{displayInput ? displayInput.axes.map((a, i) => (
 											<span key={i} className="input-bar-pill" title={`Axis ${i} (${STANDARD_AXIS_LABELS[i] ?? i}): ${a.toFixed(2)}`}>
 												{STANDARD_AXIS_LABELS[i] ?? `Axis ${i}`}: {a.toFixed(2)}
 											</span>
@@ -422,7 +447,7 @@ export default function Home() {
 								<div className="input-bar-row">
 									<span className="input-bar-label">Buttons</span>
 									<div className="input-bar-buttons">
-										{lastInput ? lastInput.buttons.map((b, i) => {
+										{displayInput ? displayInput.buttons.map((b, i) => {
 											const label = controllerType === "playstation" ? (PS_BUTTON_LABELS[i] ?? i) : (XBOX_BUTTON_LABELS[i] ?? i);
 											return (
 												<span key={i} className={"input-bar-pill " + (Number(b) > 0.5 ? "on" : "")} title={`Button ${i}: ${label}`}>
@@ -443,8 +468,8 @@ export default function Home() {
 												<div
 													className="stick-dot"
 													style={{
-														left: lastInput && lastInput.axes[0] !== undefined ? `${50 + lastInput.axes[0] * 45}%` : "50%",
-														top: lastInput && lastInput.axes[1] !== undefined ? `${50 - lastInput.axes[1] * 45}%` : "50%",
+														left: displayInput && displayInput.axes[0] !== undefined ? `${50 + displayInput.axes[0] * 45}%` : "50%",
+														top: displayInput && displayInput.axes[1] !== undefined ? `${50 - displayInput.axes[1] * 45}%` : "50%",
 														transform: "translate(-50%, -50%)",
 													}}
 												/>
@@ -456,8 +481,8 @@ export default function Home() {
 												<div
 													className="stick-dot"
 													style={{
-														left: lastInput && lastInput.axes[2] !== undefined ? `${50 + lastInput.axes[2] * 45}%` : "50%",
-														top: lastInput && lastInput.axes[3] !== undefined ? `${50 - lastInput.axes[3] * 45}%` : "50%",
+														left: displayInput && displayInput.axes[2] !== undefined ? `${50 + displayInput.axes[2] * 45}%` : "50%",
+														top: displayInput && displayInput.axes[3] !== undefined ? `${50 - displayInput.axes[3] * 45}%` : "50%",
 														transform: "translate(-50%, -50%)",
 													}}
 												/>
@@ -469,7 +494,7 @@ export default function Home() {
 								<div className="input-bar-row">
 									<span className="input-bar-label">Buttons</span>
 									<div className="input-bar-buttons">
-										{lastInput ? lastInput.buttons.slice(0, 16).map((b, i) => {
+										{displayInput ? displayInput.buttons.slice(0, 16).map((b, i) => {
 											const pressed = Number(b) > 0.5;
 											const iconType = controllerType === "playstation" ? "playstation" : "xbox";
 											return (
@@ -731,6 +756,17 @@ export default function Home() {
 					display: flex;
 					gap: 1rem;
 					align-items: center;
+				}
+				.input-bar-playback {
+					background: rgba(0, 0, 0, 0.2);
+					margin: -0.25rem 0 0.25rem 0;
+					padding: 0.25rem 0;
+					border-radius: 4px;
+				}
+				.input-bar-playback-label {
+					font-size: 0.7rem;
+					color: var(--muted);
+					margin-right: 0.5rem;
 				}
 				.input-bar-macros .input-bar-macro-controls {
 					display: flex;
