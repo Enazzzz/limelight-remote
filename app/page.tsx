@@ -31,7 +31,10 @@ export default function Home() {
 	const [connectionError, setConnectionError] = useState<string | null>(null);
 	const [controllerActive, setControllerActive] = useState(false);
 	const [autoConnecting, setAutoConnecting] = useState(false);
+	const [lastInput, setLastInput] = useState<{ axes: number[]; buttons: number[] } | null>(null);
+	const [showInputBar, setShowInputBar] = useState(false);
 	const wsRef = useRef<WebSocket | null>(null);
+	const [connectionId, setConnectionId] = useState(0);
 	const pollRef = useRef<number>(0);
 	const autoConnectDoneRef = useRef(false);
 	const connectRef = useRef<() => void>(() => {});
@@ -82,8 +85,9 @@ export default function Home() {
 		const wsUrl = `${wsProtocol}://${base.replace(/^https?:\/\//, "")}/ws`;
 		const ws = new WebSocket(wsUrl);
 		ws.onopen = () => {
-			setConnected(true);
 			wsRef.current = ws;
+			setConnectionId((c) => c + 1);
+			setConnected(true);
 		};
 		ws.onclose = (ev) => {
 			setConnected(false);
@@ -118,9 +122,12 @@ export default function Home() {
 		setConnected(false);
 	}, []);
 
+	// Restart gamepad polling whenever we get a new connection (connectionId) so reconnect works
 	useEffect(() => {
-		if (!connected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+		if (!connected) return;
+		const id = connectionIdRef.current;
 		const sendController = () => {
+			if (wsRef.current?.readyState !== WebSocket.OPEN) return;
 			const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
 			const pad = gamepads[0];
 			if (!pad) {
@@ -128,12 +135,10 @@ export default function Home() {
 				return;
 			}
 			setControllerActive(true);
-			const state = {
-				axes: Array.from(pad.axes),
-				buttons: pad.buttons.map((b) => (typeof b === "object" ? b.value : b)),
-				id: pad.id,
-				timestamp: Date.now(),
-			};
+			const axes = Array.from(pad.axes);
+			const buttons = pad.buttons.map((b) => (typeof b === "object" ? b.value : b));
+			setLastInput({ axes, buttons });
+			const state = { axes, buttons, id: pad.id, timestamp: Date.now() };
 			try {
 				wsRef.current?.send(JSON.stringify(state));
 			} catch {
@@ -144,68 +149,115 @@ export default function Home() {
 		return () => {
 			if (pollRef.current) clearInterval(pollRef.current);
 		};
-	}, [connected]);
+	}, [connected, connectionId]);
 
 	// Use proxy so ngrok's free-tier interstitial is skipped (server sends ngrok-skip-browser-warning)
 	const streamUrl = bridgeUrl ? `${bridgeUrl}${STREAM_PATH}` : "";
 	const iframeSrc = streamUrl ? `/api/proxy?url=${encodeURIComponent(streamUrl)}` : "";
+	const theaterMode = connected && iframeSrc;
 
 	return (
-		<main className="container">
-			<header className="header">
-				<h1>Remote Limelight</h1>
-				<p className="muted">Stream from your PC · One viewer at a time</p>
-			</header>
-
-			<section className="bridge-section">
-				<label className="label">
-					Bridge URL (host shares this with you — works from any network)
-					{autoConnecting && <span className="connecting"> Connecting…</span>}
-				</label>
-				<div className="row">
-					<input
-						type="url"
-						placeholder="https://xxxx.ngrok.io"
-						value={bridgeInput}
-						onChange={(e) => setBridgeInput(e.target.value)}
-						onKeyDown={(e) => e.key === "Enter" && connect()}
-						disabled={connected}
-						className="input"
-					/>
-					{connected ? (
-						<button type="button" onClick={disconnect} className="btn btn-danger">
-							Disconnect
-						</button>
-					) : (
-						<button type="button" onClick={connect} className="btn btn-primary">
-							Connect
-						</button>
-					)}
-				</div>
-				{connectionError && <p className="error">{connectionError}</p>}
-			</section>
+		<main className={theaterMode ? "container theater" : "container"}>
+			{!theaterMode && (
+				<>
+					<header className="header">
+						<h1>Remote Limelight</h1>
+						<p className="muted">Stream from your PC · One viewer at a time</p>
+					</header>
+					<section className="bridge-section">
+						<label className="label">
+							Bridge URL (host shares this with you — works from any network)
+							{autoConnecting && <span className="connecting"> Connecting…</span>}
+						</label>
+						<div className="row">
+							<input
+								type="url"
+								placeholder="https://xxxx.ngrok.io"
+								value={bridgeInput}
+								onChange={(e) => setBridgeInput(e.target.value)}
+								onKeyDown={(e) => e.key === "Enter" && connect()}
+								disabled={connected}
+								className="input"
+							/>
+							{connected ? (
+								<button type="button" onClick={disconnect} className="btn btn-danger">
+									Disconnect
+								</button>
+							) : (
+								<button type="button" onClick={connect} className="btn btn-primary">
+									Connect
+								</button>
+							)}
+						</div>
+						{connectionError && <p className="error">{connectionError}</p>}
+					</section>
+				</>
+			)}
 
 			{iframeSrc && (
-				<section className="stream-section">
-					<div className="stream-header">
-						<span>Live feed</span>
-						{connected && (
-							<span className={`badge ${controllerActive ? "active" : ""}`}>
-								{controllerActive ? "Controller connected" : "Connect a gamepad (Xbox, PS5, etc.)"}
+				<section className={"stream-section" + (theaterMode ? " stream-full" : "")}>
+					{theaterMode && (
+						<div className="top-bar">
+							<span className="top-bar-title">Remote Limelight</span>
+							<span className={`top-bar-badge ${controllerActive ? "active" : ""}`}>
+								{controllerActive ? "Gamepad" : "No gamepad"}
 							</span>
-						)}
-					</div>
+							<button type="button" onClick={() => setShowInputBar((v) => !v)} className="btn btn-ghost">
+								{showInputBar ? "Hide inputs" : "Show inputs"}
+							</button>
+							<button type="button" onClick={disconnect} className="btn btn-danger btn-sm">
+								Disconnect
+							</button>
+						</div>
+					)}
+					{!theaterMode && (
+						<div className="stream-header">
+							<span>Live feed</span>
+							{connected && (
+								<span className={`badge ${controllerActive ? "active" : ""}`}>
+									{controllerActive ? "Controller connected" : "Connect a gamepad (Xbox, PS5, etc.)"}
+								</span>
+							)}
+						</div>
+					)}
 					<div className="stream-wrap">
 						<iframe title="Limelight stream" src={iframeSrc} className="stream-iframe" allow="autoplay" />
 					</div>
 				</section>
 			)}
 
-			<footer className="footer">
-				<p>
-					<strong>Host:</strong> Run <code>npm start</code> on your PC (set <code>NGROK_AUTHTOKEN</code> in <code>.env</code> once). Share the printed link with the viewer — they open it and connect automatically, or paste the bridge URL above. <strong>Viewer:</strong> Use the link from the host or paste the bridge URL and click Connect.
-				</p>
-			</footer>
+			{theaterMode && showInputBar && (
+				<div className="input-bar">
+					<div className="input-bar-row">
+						<span className="input-bar-label">Axes</span>
+						<div className="input-bar-axes">
+							{lastInput ? lastInput.axes.map((a, i) => (
+								<span key={i} className="input-bar-pill" title={`Axis ${i}: ${a.toFixed(2)}`}>
+									{i}:{a.toFixed(1)}
+								</span>
+							)) : "—"}
+						</div>
+					</div>
+					<div className="input-bar-row">
+						<span className="input-bar-label">Buttons</span>
+						<div className="input-bar-buttons">
+							{lastInput ? lastInput.buttons.map((b, i) => (
+								<span key={i} className={"input-bar-pill " + (Number(b) > 0.5 ? "on" : "")} title={`Button ${i}`}>
+									{i}
+								</span>
+							)) : "—"}
+						</div>
+					</div>
+				</div>
+			)}
+
+			{!theaterMode && (
+				<footer className="footer">
+					<p>
+						<strong>Host:</strong> Run <code>npm start</code> on your PC (set <code>NGROK_AUTHTOKEN</code> in <code>.env</code> once). Share the printed link with the viewer — they open it and connect automatically, or paste the bridge URL above. <strong>Viewer:</strong> Use the link from the host or paste the bridge URL and click Connect.
+					</p>
+				</footer>
+			)}
 
 			<style jsx>{`
 				.container {
@@ -215,6 +267,106 @@ export default function Home() {
 					min-height: 100vh;
 					display: flex;
 					flex-direction: column;
+				}
+				.container.theater {
+					max-width: none;
+					padding: 0;
+					height: 100vh;
+					overflow: hidden;
+				}
+				.stream-section.stream-full {
+					flex: 1;
+					display: flex;
+					flex-direction: column;
+					min-height: 0;
+					height: 100%;
+				}
+				.stream-section.stream-full .stream-wrap {
+					flex: 1;
+					min-height: 0;
+					aspect-ratio: unset;
+					max-height: none;
+					border-radius: 0;
+					border: none;
+				}
+				.stream-section.stream-full .stream-iframe {
+					width: 100%;
+					height: 100%;
+				}
+				.top-bar {
+					display: flex;
+					align-items: center;
+					gap: 0.75rem;
+					padding: 0.5rem 1rem;
+					background: rgba(15, 15, 18, 0.92);
+					border-bottom: 1px solid var(--border);
+					flex-shrink: 0;
+				}
+				.top-bar-title {
+					font-size: 0.875rem;
+					font-weight: 600;
+					margin-right: auto;
+				}
+				.top-bar-badge {
+					font-size: 0.7rem;
+					padding: 0.2rem 0.5rem;
+					background: var(--surface);
+					border-radius: 4px;
+					color: var(--muted);
+				}
+				.top-bar-badge.active {
+					background: rgba(34, 197, 94, 0.2);
+					color: var(--accent);
+				}
+				.btn-ghost {
+					background: transparent;
+					color: var(--muted);
+					border: 1px solid var(--border);
+				}
+				.btn-ghost:hover {
+					background: var(--surface);
+					color: var(--text);
+				}
+				.btn-sm {
+					padding: 0.35rem 0.75rem;
+					font-size: 0.8rem;
+				}
+				.input-bar {
+					flex-shrink: 0;
+					padding: 0.5rem 1rem;
+					background: rgba(15, 15, 18, 0.95);
+					border-top: 1px solid var(--border);
+					font-size: 0.75rem;
+					color: var(--muted);
+				}
+				.input-bar-row {
+					display: flex;
+					align-items: center;
+					gap: 0.5rem;
+					margin-bottom: 0.25rem;
+				}
+				.input-bar-row:last-child {
+					margin-bottom: 0;
+				}
+				.input-bar-label {
+					min-width: 3rem;
+				}
+				.input-bar-axes,
+				.input-bar-buttons {
+					display: flex;
+					flex-wrap: wrap;
+					gap: 0.25rem;
+				}
+				.input-bar-pill {
+					display: inline-block;
+					padding: 0.15rem 0.4rem;
+					background: var(--surface);
+					border-radius: 4px;
+					color: var(--text);
+				}
+				.input-bar-pill.on {
+					background: var(--accent);
+					color: var(--bg);
 				}
 				.header {
 					margin-bottom: 1.5rem;
