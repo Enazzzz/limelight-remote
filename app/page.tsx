@@ -125,7 +125,6 @@ export default function Home() {
 	// Restart gamepad polling whenever we get a new connection (connectionId) so reconnect works
 	useEffect(() => {
 		if (!connected) return;
-		const id = connectionIdRef.current;
 		const sendController = () => {
 			if (wsRef.current?.readyState !== WebSocket.OPEN) return;
 			const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
