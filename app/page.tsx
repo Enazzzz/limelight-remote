@@ -10,9 +10,12 @@ const STREAM_PATH = "/";
 type MacroFrame = { axes: number[]; buttons: number[]; timestamp: number };
 type SavedMacro = { id: string; name: string; frames: MacroFrame[] };
 
-/** Button labels by controller type (standard gamepad order: face 0–3, bumpers 4–5, back/start 6–7, stick 8–9) */
-const XBOX_BUTTON_LABELS = ["A", "B", "X", "Y", "LB", "RB", "Back", "Start", "L3", "R3"];
-const PS_BUTTON_LABELS = ["✕", "○", "□", "△", "L1", "R1", "Share", "Options", "L3", "R3"]; // Cross, Circle, Square, Triangle
+// W3C Standard Gamepad: https://w3c.github.io/gamepad/#remapping
+// Buttons: 0–3 face (A,B,X,Y / Cross,Circle,Square,Triangle), 4–5 bumpers, 6–7 triggers, 8 Back, 9 Start, 10 L3, 11 R3, 12–15 D-pad
+const XBOX_BUTTON_LABELS: string[] = ["A", "B", "X", "Y", "LB", "RB", "LT", "RT", "Back", "Start", "L3", "R3", "D↑", "D↓", "D←", "D→"];
+const PS_BUTTON_LABELS: string[] = ["✕", "○", "□", "△", "L1", "R1", "L2", "R2", "Share", "Options", "L3", "R3", "D↑", "D↓", "D←", "D→"]; // Cross, Circle, Square, Triangle
+// Axes: 0 Left stick X, 1 Left stick Y, 2 Right stick X, 3 Right stick Y; some pads use 4/5 for triggers
+const STANDARD_AXIS_LABELS = ["L.X", "L.Y", "R.X", "R.Y", "LT", "RT"];
 
 /** Tiny SVG icons for face buttons (0–3) in friendly mode */
 function FaceButtonIcon({ type, index, pressed }: { type: "xbox" | "playstation"; index: number; pressed: boolean }) {
@@ -405,8 +408,8 @@ export default function Home() {
 									<span className="input-bar-label">Axes</span>
 									<div className="input-bar-axes">
 										{lastInput ? lastInput.axes.map((a, i) => (
-											<span key={i} className="input-bar-pill" title={`Axis ${i}: ${a.toFixed(2)}`}>
-												Axis {i}: {a.toFixed(2)}
+											<span key={i} className="input-bar-pill" title={`Axis ${i} (${STANDARD_AXIS_LABELS[i] ?? i}): ${a.toFixed(2)}`}>
+												{STANDARD_AXIS_LABELS[i] ?? `Axis ${i}`}: {a.toFixed(2)}
 											</span>
 										)) : "—"}
 									</div>
@@ -414,11 +417,14 @@ export default function Home() {
 								<div className="input-bar-row">
 									<span className="input-bar-label">Buttons</span>
 									<div className="input-bar-buttons">
-										{lastInput ? lastInput.buttons.map((b, i) => (
-											<span key={i} className={"input-bar-pill " + (Number(b) > 0.5 ? "on" : "")} title={`Button ${i}`}>
-												Button {i}
-											</span>
-										)) : "—"}
+										{lastInput ? lastInput.buttons.map((b, i) => {
+											const label = controllerType === "playstation" ? (PS_BUTTON_LABELS[i] ?? i) : (XBOX_BUTTON_LABELS[i] ?? i);
+											return (
+												<span key={i} className={"input-bar-pill " + (Number(b) > 0.5 ? "on" : "")} title={`Button ${i}: ${label}`}>
+													{i} ({label})
+												</span>
+											);
+										}) : "—"}
 									</div>
 								</div>
 							</>
@@ -458,7 +464,7 @@ export default function Home() {
 								<div className="input-bar-row">
 									<span className="input-bar-label">Buttons</span>
 									<div className="input-bar-buttons">
-										{lastInput ? lastInput.buttons.slice(0, 10).map((b, i) => {
+										{lastInput ? lastInput.buttons.slice(0, 16).map((b, i) => {
 											const pressed = Number(b) > 0.5;
 											const iconType = controllerType === "playstation" ? "playstation" : "xbox";
 											return (
@@ -700,11 +706,14 @@ export default function Home() {
 					gap: 0.25rem;
 				}
 				.input-bar-pill {
-					display: inline-block;
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
 					padding: 0.15rem 0.4rem;
 					background: var(--surface);
 					border-radius: 4px;
 					color: var(--text);
+					min-height: 1.5em;
 				}
 				.input-bar-pill.on {
 					background: var(--accent);
@@ -712,7 +721,6 @@ export default function Home() {
 				}
 				.input-bar-pill .face-icon {
 					display: block;
-					vertical-align: middle;
 				}
 				.input-bar-sticks {
 					display: flex;
