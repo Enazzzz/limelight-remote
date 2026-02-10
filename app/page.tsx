@@ -252,6 +252,11 @@ export default function Home() {
 			}
 			setControllerActive(true);
 			const axes = Array.from(pad.axes);
+			// PlayStation reports stick Y inverted vs standard; flip so up = negative, down = positive
+			if (detectControllerType(pad.id) === "playstation") {
+				if (axes.length > 1) axes[1] = -axes[1];
+				if (axes.length > 3) axes[3] = -axes[3];
+			}
 			const buttons = pad.buttons.map((b) => (typeof b === "object" ? b.value : b));
 			setLastInput({ axes, buttons, id: pad.id });
 			const state = { axes, buttons, id: pad.id, timestamp: Date.now() };
