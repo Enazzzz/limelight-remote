@@ -146,7 +146,9 @@ export default function Home() {
 		};
 	}, [connected]);
 
+	// Use proxy so ngrok's free-tier interstitial is skipped (server sends ngrok-skip-browser-warning)
 	const streamUrl = bridgeUrl ? `${bridgeUrl}${STREAM_PATH}` : "";
+	const iframeSrc = streamUrl ? `/api/proxy?url=${encodeURIComponent(streamUrl)}` : "";
 
 	return (
 		<main className="container">
@@ -183,7 +185,7 @@ export default function Home() {
 				{connectionError && <p className="error">{connectionError}</p>}
 			</section>
 
-			{streamUrl && (
+			{iframeSrc && (
 				<section className="stream-section">
 					<div className="stream-header">
 						<span>Live feed</span>
@@ -194,7 +196,7 @@ export default function Home() {
 						)}
 					</div>
 					<div className="stream-wrap">
-						<iframe title="Limelight stream" src={streamUrl} className="stream-iframe" allow="autoplay" />
+						<iframe title="Limelight stream" src={iframeSrc} className="stream-iframe" allow="autoplay" />
 					</div>
 				</section>
 			)}
