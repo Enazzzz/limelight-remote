@@ -15,8 +15,10 @@ const CONTROLLER_LOG_PATH = process.env.BRIDGE_CONTROLLER_LOG || "";
 
 let currentClient = null;
 
+const LOG_TO_CONSOLE = process.env.BRIDGE_LOG_CONTROLLER === "1" || process.env.BRIDGE_LOG_CONTROLLER === "true";
+
 function onControllerMessage(msg) {
-	console.log("[controller]", JSON.stringify(msg));
+	if (LOG_TO_CONSOLE) console.log("[controller]", JSON.stringify(msg));
 	if (CONTROLLER_LOG_PATH) {
 		try {
 			fs.appendFileSync(CONTROLLER_LOG_PATH, JSON.stringify(msg) + "\n");
