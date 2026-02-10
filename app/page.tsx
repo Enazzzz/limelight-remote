@@ -191,7 +191,7 @@ export default function Home() {
 						<span>Live feed</span>
 						{connected && (
 							<span className={`badge ${controllerActive ? "active" : ""}`}>
-								{controllerActive ? "Controller connected" : "Connect a gamepad"}
+								{controllerActive ? "Controller connected" : "Connect a gamepad (Xbox, PS5, etc.)"}
 							</span>
 						)}
 					</div>
@@ -287,10 +287,10 @@ export default function Home() {
 					margin: 0.5rem 0 0 0;
 				}
 				.stream-section {
-					flex: 1;
+					flex: 1 1 auto;
 					display: flex;
 					flex-direction: column;
-					min-height: 400px;
+					min-height: 0;
 				}
 				.stream-header {
 					display: flex;
@@ -299,6 +299,7 @@ export default function Home() {
 					margin-bottom: 0.5rem;
 					font-size: 0.875rem;
 					color: var(--muted);
+					flex-shrink: 0;
 				}
 				.badge {
 					font-size: 0.75rem;
@@ -312,19 +313,22 @@ export default function Home() {
 					color: var(--accent);
 				}
 				.stream-wrap {
-					flex: 1;
+					flex: 1 1 auto;
 					background: var(--surface);
 					border: 1px solid var(--border);
 					border-radius: var(--radius);
 					overflow: hidden;
-					min-height: 360px;
+					aspect-ratio: 16 / 9;
+					width: 100%;
+					max-height: min(70vh, 540px);
+					contain: layout;
 				}
 				.stream-iframe {
 					width: 100%;
 					height: 100%;
-					min-height: 360px;
 					border: none;
 					display: block;
+					background: var(--surface);
 				}
 				.footer {
 					margin-top: 1.5rem;
