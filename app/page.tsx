@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const BRIDGE_STORAGE_KEY = "remote-limelight-bridge-url";
 const MACROS_STORAGE_KEY = "remote-limelight-macros";
+const STREAM_SCALE_STORAGE_KEY = "remote-limelight-stream-scale";
+const STREAM_SCALE_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5] as const;
 const DEFAULT_BRIDGE_URL = process.env.NEXT_PUBLIC_BRIDGE_URL || "";
 const STREAM_PATH = "/";
 
@@ -91,6 +93,19 @@ export default function Home() {
 	const [playingMacroId, setPlayingMacroId] = useState<string | null>(null);
 	const [playbackCurrentFrame, setPlaybackCurrentFrame] = useState<{ axes: number[]; buttons: number[] } | null>(null);
 	const [selectedMacroId, setSelectedMacroId] = useState<string>("");
+	const [streamScale, setStreamScale] = useState<number>(() => {
+		if (typeof window === "undefined") return 1;
+		try {
+			const v = localStorage.getItem(STREAM_SCALE_STORAGE_KEY);
+			if (v != null) {
+				const n = Number(v);
+				if (STREAM_SCALE_OPTIONS.includes(n as (typeof STREAM_SCALE_OPTIONS)[number])) return n;
+			}
+		} catch {
+			// ignore
+		}
+		return 1;
+	});
 	const wsRef = useRef<WebSocket | null>(null);
 	const [connectionId, setConnectionId] = useState(0);
 	const pollRef = useRef<number>(0);
@@ -259,8 +274,9 @@ export default function Home() {
 			}
 			setControllerActive(true);
 			const axes = Array.from(pad.axes);
-			// PlayStation reports stick Y inverted vs standard; flip so up = negative, down = positive
-			if (detectControllerType(pad.id) === "playstation") {
+			// PlayStation and Xbox report stick Y inverted vs standard; flip so up = negative, down = positive
+			const padType = detectControllerType(pad.id);
+			if (padType === "playstation" || padType === "xbox") {
 				if (axes.length > 1) axes[1] = -axes[1];
 				if (axes.length > 3) axes[3] = -axes[3];
 			}
@@ -383,6 +399,29 @@ export default function Home() {
 									<button type="button" onClick={() => setShowInputBar((v) => !v)} className="btn btn-ghost">
 										{showInputBar ? "Hide inputs" : "Show inputs"}
 									</button>
+									<label className="top-bar-scale">
+										<span className="top-bar-scale-label">Scale</span>
+										<select
+											className="input input-topbar input-scale"
+											value={streamScale}
+											onChange={(e) => {
+												const v = Number(e.target.value);
+												setStreamScale(v);
+												try {
+													localStorage.setItem(STREAM_SCALE_STORAGE_KEY, String(v));
+												} catch {
+													// ignore
+												}
+											}}
+											title="Limelight feed zoom"
+										>
+											{STREAM_SCALE_OPTIONS.map((s) => (
+												<option key={s} value={s}>
+													{Math.round(s * 100)}%
+												</option>
+											))}
+										</select>
+									</label>
 									<button type="button" onClick={disconnect} className="btn btn-danger btn-sm">
 										Disconnect
 									</button>
@@ -414,8 +453,16 @@ export default function Home() {
 							)}
 						</div>
 					)}
-					<div className="stream-wrap">
-						<iframe title="Limelight stream" src={iframeSrc} className="stream-iframe" allow="autoplay" />
+					<div className="stream-scale-container">
+						<div
+							className="stream-wrap"
+							style={{
+								transform: `scale(${streamScale})`,
+								transformOrigin: "center center",
+							}}
+						>
+							<iframe title="Limelight stream" src={iframeSrc} className="stream-iframe" allow="autoplay" />
+						</div>
 					</div>
 				</section>
 			)}
@@ -623,13 +670,23 @@ export default function Home() {
 					min-height: 0;
 					height: 100%;
 				}
-				.stream-section.stream-full .stream-wrap {
+				.stream-section.stream-full .stream-scale-container {
+					flex: 1;
+					min-height: 0;
+					overflow: hidden;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+				.stream-section.stream-full .stream-scale-container .stream-wrap {
 					flex: 1;
 					min-height: 0;
 					aspect-ratio: unset;
 					max-height: none;
 					border-radius: 0;
 					border: none;
+					width: 100%;
+					height: 100%;
 				}
 				.stream-section.stream-full .stream-iframe {
 					width: 100%;
@@ -648,6 +705,20 @@ export default function Home() {
 					font-size: 0.875rem;
 					font-weight: 600;
 					margin-right: auto;
+				}
+				.top-bar-scale {
+					display: flex;
+					align-items: center;
+					gap: 0.35rem;
+				}
+				.top-bar-scale-label {
+					font-size: 0.75rem;
+					color: var(--muted);
+				}
+				.input-scale {
+					width: 4rem;
+					padding: 0.2rem 0.35rem;
+					font-size: 0.8rem;
 				}
 				.top-bar-badge {
 					font-size: 0.7rem;
@@ -905,15 +976,23 @@ export default function Home() {
 					background: rgba(34, 197, 94, 0.2);
 					color: var(--accent);
 				}
-				.stream-wrap {
+				.stream-scale-container {
 					flex: 1 1 auto;
+					width: 100%;
+					aspect-ratio: 16 / 9;
+					max-height: min(70vh, 540px);
+					overflow: hidden;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+				}
+				.stream-wrap {
+					width: 100%;
+					height: 100%;
 					background: var(--surface);
 					border: 1px solid var(--border);
 					border-radius: var(--radius);
 					overflow: hidden;
-					aspect-ratio: 16 / 9;
-					width: 100%;
-					max-height: min(70vh, 540px);
 					contain: layout;
 				}
 				.stream-iframe {
